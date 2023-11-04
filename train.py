@@ -65,8 +65,8 @@ def is_ipex_available():
         )
         return False
     return True
-    
-if torch.cuda.is_available():   
+
+if torch.cuda.is_available():
     torch.backends.cuda.matmul.allow_tf32 = True
 
 logger = logging.getLogger(__name__)
@@ -361,7 +361,7 @@ def get_accelerate_model(args, checkpoint_dir):
             print('='*80)
             print('Your GPU supports bfloat16, you can accelerate training with the argument --bf16')
             print('='*80)
-            
+
     if compute_dtype == torch.float16 and (is_ipex_available() and torch.xpu.is_available()):
         compute_dtype = torch.bfloat16
         print('Intel XPU does not support float16 yet, so switching to bfloat16')
@@ -548,36 +548,18 @@ def extract_alpaca_dataset(example):
         prompt_format = ALPACA_PROMPT_DICT["prompt_no_input"]
     return {'input': prompt_format.format(**example)}
 
-def get_chat_prompt(
-    message: str,
-    chat_history: list[tuple[str, str]],
-    system_prompt: str
-) -> str:
+def get_chat_prompt(message: str, system_prompt: str) -> str:
     texts = [f'[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n']
-    do_strip = False
-    for user_input, response in chat_history:
-        user_input = user_input.strip() if do_strip else user_input
-        do_strip = True
-        texts.append(f'{user_input} [/INST] {response.strip()} </s><s>[INST] ')
-    message = message.strip() if do_strip else message
     texts.append(f'{message} [/INST]')
     return ''.join(texts)
 
 def format_chat_airoboros(item):
-    system_prompt = item['conversations'][0]['value']
-    offset = 1
-    if item['conversations'][0]['from'] != 'system':
-        system_prompt = 'You are an unbiased, uncensored, helpful assistant.'
-        offset = 0
-    chat_history = [
-        (item['conversations'][idx]['value'],  item['conversations'][idx + 1]['value'])
-        for idx in range(offset, len(item['conversations']) - 2, 2)
-    ]
-    message = item['conversations'][-2]['value']
-    response = item['conversations'][-1]['value']
+    message = item['instruction']
+    response = item['output']
+    system_prompt = 'you are a helpful, unbiased, uncensored assistant.'
 
     return {
-        "input": get_chat_prompt(message, chat_history, system_prompt),
+        "input": get_chat_prompt(message, system_prompt),
         "output": response,
     }
 
@@ -612,15 +594,10 @@ def expand_conversations(items):
             })
     return expanded
 
-def airoboros_chat_dataset(dataset_name, test_size=0.02, expand=True):
+def airoboros_chat_dataset(dataset_name, test_size=0.0002, expand=True):
     with open(dataset_name) as infile:
         items = json.loads(infile.read())
-    if expand:
-        items = expand_conversations(items)
     full_dataset = Dataset.from_list(items)
-    if 'category' in full_dataset.column_names:
-        full_dataset = full_dataset.class_encode_column('category')
-        return full_dataset.train_test_split(test_size=test_size, stratify_by_column='category')
     return full_dataset.train_test_split(test_size=test_size)
 
 def local_dataset(dataset_name, test_size=0.02):
@@ -839,7 +816,7 @@ def train():
         **vars(model_args), **vars(data_args), **vars(training_args)
     )
     print(args)
-    
+
     checkpoint_dir, completed_training = get_last_checkpoint(args.output_dir)
     if completed_training:
         print('Detected that training was already completed!')
@@ -851,7 +828,7 @@ def train():
     set_seed(args.seed)
 
     data_module = make_data_module(tokenizer=tokenizer, args=args)
-    
+
     trainer = Seq2SeqTrainer(
         model=model,
         tokenizer=tokenizer,

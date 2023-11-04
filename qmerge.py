@@ -96,11 +96,11 @@ def main():
     with open(os.path.join(args.out, 'config.json'), 'w') as config:
         config.write(json.dumps(config_data, indent=2))
     print(f"Model saved: {args.out}")
-    if args.push:
-        print(f"Saving to hub ...")
-        model.push_to_hub(args.out, use_temp_dir=False)
-        tokenizer.push_to_hub(args.out, use_temp_dir=False)
-        print("Model successfully pushed to hf.")
+    # if args.push:
+    #     print(f"Saving to hub ...")
+    #     model.push_to_hub(args.out, use_temp_dir=False)
+    #     tokenizer.push_to_hub(args.out, use_temp_dir=False)
+    #     print("Model successfully pushed to hf.")
 
 if __name__ == "__main__":
     main()
